@@ -1,17 +1,23 @@
-import { RedirectToSignIn } from "@clerk/nextjs";
 import { auth } from "@clerk/nextjs/server";
 import { JobFeed } from "@/components/JobFeed";
+import { LandingPage } from "@/components/LandingPage";
 import type { Job } from "@/lib/jobs";
 import { createClient } from "@/utils/supabase/server";
 
 export default async function Home() {
   const { userId } = await auth();
+  const supabase = await createClient();
 
   if (!userId) {
-    return <RedirectToSignIn />;
+    const { data: previewJobs } = await supabase
+      .from("jobs")
+      .select("*")
+      .order("publication_date", { ascending: false })
+      .limit(6);
+
+    return <LandingPage previewJobs={(previewJobs ?? []) as Job[]} />;
   }
 
-  const supabase = await createClient();
   const [{ data: jobs, error: jobsError }, { data: savedJobs, error: savedError }] =
     await Promise.all([
       supabase

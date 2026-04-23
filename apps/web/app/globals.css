@@ -23,3 +23,7 @@ body {
   background: var(--background);
   color: var(--foreground);
 }
+
+::selection {
+  background: rgba(14, 165, 233, 0.18);
+}
