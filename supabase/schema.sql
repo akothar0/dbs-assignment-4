@@ -12,8 +12,22 @@ CREATE TABLE IF NOT EXISTS jobs (
   location text,
   publication_date timestamptz,
   company_logo text,
+  is_active boolean NOT NULL DEFAULT true,
+  last_seen_at timestamptz NOT NULL DEFAULT now(),
+  archived_at timestamptz,
   created_at timestamptz DEFAULT now()
 );
+
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS is_active boolean NOT NULL DEFAULT true;
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS last_seen_at timestamptz NOT NULL DEFAULT now();
+ALTER TABLE jobs ADD COLUMN IF NOT EXISTS archived_at timestamptz;
+
+UPDATE jobs
+SET
+  is_active = COALESCE(is_active, true),
+  last_seen_at = COALESCE(last_seen_at, now())
+WHERE is_active IS DISTINCT FROM COALESCE(is_active, true)
+   OR last_seen_at IS NULL;
 
 -- User preferences table
 CREATE TABLE IF NOT EXISTS user_preferences (

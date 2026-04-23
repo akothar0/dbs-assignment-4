@@ -1,7 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { JobFeed } from "@/components/JobFeed";
 import { LandingPage } from "@/components/LandingPage";
-import type { Job } from "@/lib/jobs";
+import { deriveAvailableCategories, type Job } from "@/lib/jobs";
 import { createClient } from "@/utils/supabase/server";
 
 export default async function Home() {
@@ -12,23 +12,29 @@ export default async function Home() {
     const { data: previewJobs } = await supabase
       .from("jobs")
       .select("*")
+      .eq("is_active", true)
       .order("publication_date", { ascending: false })
       .limit(6);
 
     return <LandingPage previewJobs={(previewJobs ?? []) as Job[]} />;
   }
 
-  const [{ data: jobs, error: jobsError }, { data: savedJobs, error: savedError }] =
-    await Promise.all([
-      supabase
-        .from("jobs")
-        .select("*")
-        .order("publication_date", { ascending: false })
-        .limit(150),
-      supabase.from("saved_jobs").select("job_id").eq("user_id", userId),
-    ]);
+  const [
+    { data: jobs, error: jobsError },
+    { data: savedJobs, error: savedError },
+    { data: categoryRows, error: categoriesError },
+  ] = await Promise.all([
+    supabase
+      .from("jobs")
+      .select("*")
+      .eq("is_active", true)
+      .order("publication_date", { ascending: false })
+      .limit(150),
+    supabase.from("saved_jobs").select("job_id").eq("user_id", userId),
+    supabase.from("jobs").select("category").eq("is_active", true),
+  ]);
 
-  if (jobsError || savedError) {
+  if (jobsError || savedError || categoriesError) {
     return (
       <main className="mx-auto flex w-full max-w-6xl flex-1 items-center justify-center px-4 py-16 sm:px-6">
         <div className="max-w-lg rounded-[28px] border border-rose-200 bg-white p-8 text-center shadow-[0_20px_70px_-40px_rgba(15,23,42,0.45)]">
@@ -52,6 +58,7 @@ export default async function Home() {
       <JobFeed
         initialJobs={(jobs ?? []) as Job[]}
         initialSavedJobIds={(savedJobs ?? []).map((entry) => entry.job_id)}
+        availableCategories={deriveAvailableCategories(categoryRows ?? [])}
       />
     </main>
   );

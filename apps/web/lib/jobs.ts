@@ -11,30 +11,24 @@ export interface Job {
   location: string | null;
   publication_date: string | null;
   company_logo: string | null;
+  is_active: boolean;
+  last_seen_at: string;
+  archived_at: string | null;
   created_at: string;
 }
 
 export interface UserPreferences {
   categories: string[];
   keywords: string[];
+  compatibilityNotice?: string | null;
 }
 
-export const JOB_CATEGORIES = [
-  "software-dev",
-  "customer-support",
-  "design",
-  "marketing",
-  "sales",
-  "product",
-  "business",
-  "data",
-  "devops",
-  "finance",
-  "human-resources",
-  "qa",
-  "writing",
-  "all-others",
-] as const;
+export const LEGACY_CATEGORY_MAP: Record<string, string> = {
+  "software-dev": "Software Development",
+  "customer-support": "Customer Service",
+  "all-others": "All others",
+  product: "Project Management",
+};
 
 const CATEGORY_STYLES: Record<string, string> = {
   "software-dev": "bg-sky-100 text-sky-800 ring-sky-200",
@@ -87,6 +81,87 @@ export function parseKeywordQuery(query: string) {
     .split(",")
     .map((term) => term.trim().toLowerCase())
     .filter(Boolean);
+}
+
+export function deriveAvailableCategories(
+  jobs: Array<Pick<Job, "category">>,
+) {
+  const counts = new Map<string, number>();
+
+  jobs.forEach((job) => {
+    if (!job.category) {
+      return;
+    }
+
+    counts.set(job.category, (counts.get(job.category) ?? 0) + 1);
+  });
+
+  return Array.from(counts.entries())
+    .sort((a, b) => {
+      if (b[1] !== a[1]) {
+        return b[1] - a[1];
+      }
+
+      return a[0].localeCompare(b[0]);
+    })
+    .map(([category]) => category);
+}
+
+export function sanitizePreferenceCategories(
+  categories: string[],
+  availableCategories: string[],
+) {
+  const availableSet = new Set(availableCategories);
+  const sanitizedCategories: string[] = [];
+  const remappedCategories: string[] = [];
+  const droppedCategories: string[] = [];
+
+  categories.forEach((category) => {
+    const trimmedCategory = category.trim();
+
+    if (!trimmedCategory) {
+      return;
+    }
+
+    const mappedCategory = LEGACY_CATEGORY_MAP[trimmedCategory];
+    const resolvedCategory = availableSet.has(trimmedCategory)
+      ? trimmedCategory
+      : mappedCategory;
+
+    if (resolvedCategory && availableSet.has(resolvedCategory)) {
+      if (!sanitizedCategories.includes(resolvedCategory)) {
+        sanitizedCategories.push(resolvedCategory);
+      }
+
+      if (mappedCategory && mappedCategory !== trimmedCategory) {
+        remappedCategories.push(`${trimmedCategory} -> ${mappedCategory}`);
+      }
+
+      return;
+    }
+
+    droppedCategories.push(trimmedCategory);
+  });
+
+  const noticeParts: string[] = [];
+
+  if (remappedCategories.length > 0) {
+    noticeParts.push(`Remapped: ${remappedCategories.join(", ")}.`);
+  }
+
+  if (droppedCategories.length > 0) {
+    noticeParts.push(
+      `Removed unavailable categories: ${droppedCategories.join(", ")}.`,
+    );
+  }
+
+  return {
+    categories: sanitizedCategories,
+    compatibilityNotice:
+      noticeParts.length > 0
+        ? `Updated your saved preferences to match live Remotive categories. ${noticeParts.join(" ")}`
+        : null,
+  };
 }
 
 export function jobMatchesFilters(

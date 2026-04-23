@@ -1,19 +1,26 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { JOB_CATEGORIES, formatCategoryLabel, type UserPreferences } from "@/lib/jobs";
+import { formatCategoryLabel, type UserPreferences } from "@/lib/jobs";
 
 const DEFAULT_PREFERENCES: UserPreferences = {
   categories: [],
   keywords: [],
 };
 
-export function PreferencesForm() {
+interface PreferencesFormProps {
+  availableCategories: string[];
+}
+
+export function PreferencesForm({ availableCategories }: PreferencesFormProps) {
   const [categories, setCategories] = useState<string[]>([]);
   const [keywordsInput, setKeywordsInput] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [compatibilityNotice, setCompatibilityNotice] = useState<string | null>(
+    null,
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -31,6 +38,15 @@ export function PreferencesForm() {
 
         setCategories(data.categories ?? []);
         setKeywordsInput((data.keywords ?? []).join(", "));
+
+        if (data.compatibilityNotice) {
+          const storageKey = `jobpulse-compatibility:${data.compatibilityNotice}`;
+
+          if (!window.sessionStorage.getItem(storageKey)) {
+            window.sessionStorage.setItem(storageKey, "shown");
+            setCompatibilityNotice(data.compatibilityNotice);
+          }
+        }
       } catch {
         if (!cancelled) {
           setNotice("Preferences could not be loaded.");
@@ -48,6 +64,10 @@ export function PreferencesForm() {
       cancelled = true;
     };
   }, []);
+
+  const effectiveCategories = categories.filter((category) =>
+    availableCategories.includes(category),
+  );
 
   function toggleCategory(category: string) {
     setCategories((current) =>
@@ -73,7 +93,7 @@ export function PreferencesForm() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          categories,
+          categories: effectiveCategories,
           keywords,
         }),
       });
@@ -84,6 +104,7 @@ export function PreferencesForm() {
       }
 
       setNotice("Preferences saved. Your feed will use these as defaults.");
+      setCompatibilityNotice(null);
     } catch (error) {
       setNotice(
         error instanceof Error ? error.message : "Could not save preferences.",
@@ -129,8 +150,8 @@ export function PreferencesForm() {
         </div>
 
         <div className="flex flex-wrap gap-3">
-          {JOB_CATEGORIES.map((category) => {
-            const active = categories.includes(category);
+          {availableCategories.map((category) => {
+            const active = effectiveCategories.includes(category);
 
             return (
               <button
@@ -149,6 +170,12 @@ export function PreferencesForm() {
           })}
         </div>
       </section>
+
+      {compatibilityNotice ? (
+        <div className="rounded-[24px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
+          {compatibilityNotice}
+        </div>
+      ) : null}
 
       <section className="space-y-3">
         <label htmlFor="keywords" className="block text-sm font-semibold text-slate-700">

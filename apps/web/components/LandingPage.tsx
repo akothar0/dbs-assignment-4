@@ -53,7 +53,7 @@ export function LandingPage({ previewJobs }: LandingPageProps) {
                 },
                 {
                   label: "Worker cadence",
-                  value: "5 minute Remotive poll",
+                  value: "6 hour Remotive sync",
                 },
               ].map((item) => (
                 <div

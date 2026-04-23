@@ -41,6 +41,7 @@ Worker expects `apps/worker/.env` with:
 ```bash
 SUPABASE_URL=
 SUPABASE_SERVICE_ROLE_KEY=
+POLL_INTERVAL_MS=
 ```
 
 ## Deployment

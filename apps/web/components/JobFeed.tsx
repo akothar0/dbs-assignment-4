@@ -3,7 +3,6 @@
 import { useDeferredValue, useEffect, useState } from "react";
 import { createClient } from "@/utils/supabase/client";
 import {
-  JOB_CATEGORIES,
   jobMatchesFilters,
   parseKeywordQuery,
   type Job,
@@ -12,17 +11,25 @@ import {
 import { JobCard } from "@/components/JobCard";
 
 interface JobFeedProps {
+  availableCategories: string[];
   initialJobs: Job[];
   initialSavedJobIds: string[];
 }
 
-export function JobFeed({ initialJobs, initialSavedJobIds }: JobFeedProps) {
+export function JobFeed({
+  availableCategories,
+  initialJobs,
+  initialSavedJobIds,
+}: JobFeedProps) {
   const [jobs, setJobs] = useState(initialJobs);
   const [savedJobIds, setSavedJobIds] = useState(initialSavedJobIds);
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [searchInput, setSearchInput] = useState("");
   const [preferences, setPreferences] = useState<UserPreferences | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [compatibilityNotice, setCompatibilityNotice] = useState<string | null>(
+    null,
+  );
   const [savingJobId, setSavingJobId] = useState<string | null>(null);
 
   const deferredSearchInput = useDeferredValue(searchInput);
@@ -54,6 +61,15 @@ export function JobFeed({ initialJobs, initialSavedJobIds }: JobFeedProps) {
         if (data.keywords.length > 0) {
           setSearchInput(data.keywords.join(", "));
         }
+
+        if (data.compatibilityNotice) {
+          const storageKey = `jobpulse-compatibility:${data.compatibilityNotice}`;
+
+          if (!window.sessionStorage.getItem(storageKey)) {
+            window.sessionStorage.setItem(storageKey, "shown");
+            setCompatibilityNotice(data.compatibilityNotice);
+          }
+        }
       } catch {
         // Ignore transient preference fetch failures in the client.
       }
@@ -65,6 +81,11 @@ export function JobFeed({ initialJobs, initialSavedJobIds }: JobFeedProps) {
       cancelled = true;
     };
   }, []);
+
+  const effectiveSelectedCategory =
+    selectedCategory === "all" || availableCategories.includes(selectedCategory)
+      ? selectedCategory
+      : "all";
 
   useEffect(() => {
     const supabase = createClient();
@@ -105,7 +126,7 @@ export function JobFeed({ initialJobs, initialSavedJobIds }: JobFeedProps) {
   }, [notice]);
 
   const filteredJobs = jobs.filter((job) =>
-    jobMatchesFilters(job, selectedCategory, searchTerms),
+    jobMatchesFilters(job, effectiveSelectedCategory, searchTerms),
   );
 
   async function toggleSaved(jobId: string, shouldSave: boolean) {
@@ -185,12 +206,12 @@ export function JobFeed({ initialJobs, initialSavedJobIds }: JobFeedProps) {
         <label className="space-y-2">
           <span className="text-sm font-medium text-slate-700">Category</span>
           <select
-            value={selectedCategory}
+            value={effectiveSelectedCategory}
             onChange={(event) => setSelectedCategory(event.target.value)}
             className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:bg-white"
           >
             <option value="all">All categories</option>
-            {JOB_CATEGORIES.map((category) => (
+            {availableCategories.map((category) => (
               <option key={category} value={category}>
                 {category}
               </option>
@@ -235,6 +256,12 @@ export function JobFeed({ initialJobs, initialSavedJobIds }: JobFeedProps) {
         </section>
       ) : null}
 
+      {compatibilityNotice ? (
+        <div className="rounded-[24px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
+          {compatibilityNotice}
+        </div>
+      ) : null}
+
       {notice ? (
         <div className="inline-flex items-center gap-3 rounded-full border border-sky-200 bg-sky-50 px-4 py-2 text-sm font-medium text-sky-700">
           <span className="relative flex h-2.5 w-2.5">
@@ -257,7 +284,17 @@ export function JobFeed({ initialJobs, initialSavedJobIds }: JobFeedProps) {
           </div>
         </div>
 
-        {filteredJobs.length === 0 ? (
+        {jobs.length === 0 ? (
+          <div className="rounded-[28px] border border-dashed border-slate-300 bg-white px-6 py-12 text-center">
+            <h3 className="text-xl font-semibold text-slate-950">
+              No active jobs are available right now.
+            </h3>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              The worker will repopulate the feed on the next successful Remotive
+              sync.
+            </p>
+          </div>
+        ) : filteredJobs.length === 0 ? (
           <div className="rounded-[28px] border border-dashed border-slate-300 bg-white px-6 py-12 text-center">
             <h3 className="text-xl font-semibold text-slate-950">
               No jobs match the current filters.
