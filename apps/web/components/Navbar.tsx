@@ -11,6 +11,7 @@ import {
 export function Navbar() {
   const navLinks = [
     { href: "/", label: "Feed" },
+    { href: "/saved", label: "Saved Jobs" },
     { href: "/preferences", label: "Preferences" },
   ];
 
