@@ -11,20 +11,20 @@ interface LandingPageProps {
 export function LandingPage({ previewJobs }: LandingPageProps) {
   return (
     <main className="flex-1">
-      <section className="relative overflow-hidden border-b border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.18),_transparent_28%),radial-gradient(circle_at_top_right,_rgba(15,23,42,0.18),_transparent_34%),linear-gradient(180deg,_#ffffff_0%,_#eef4fb_100%)]">
-        <div className="mx-auto grid w-full max-w-6xl gap-12 px-4 py-14 sm:px-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-end lg:px-8 lg:py-20">
+      <section className="border-b border-slate-200 bg-[linear-gradient(180deg,_#ffffff_0%,_#f8fbff_100%)]">
+        <div className="mx-auto grid w-full max-w-6xl gap-10 px-4 py-14 sm:px-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-start lg:px-8 lg:py-20">
           <div className="space-y-6">
             <div className="space-y-3">
               <p className="text-xs font-semibold uppercase tracking-[0.28em] text-sky-700">
-                Real-time Remote Job Board
+                Personalized job board
               </p>
               <h1 className="max-w-3xl text-5xl font-semibold tracking-tight text-slate-950 sm:text-6xl">
-                Track remote roles as they land, not hours later.
+                Track fresh job matches and come back to what changed.
               </h1>
               <p className="max-w-2xl text-base leading-8 text-slate-600 sm:text-lg">
-                JobPulse polls Remotive, stores jobs in Supabase, and delivers a
-                live board with saved searches, personal filters, and fast
-                bookmarking.
+                JobPulse keeps a live shortlist of current openings, helps you
+                save the roles worth revisiting, and brings the newest matches to
+                the top when you return.
               </p>
             </div>
 
@@ -44,26 +44,26 @@ export function LandingPage({ previewJobs }: LandingPageProps) {
             <div className="grid gap-3 sm:grid-cols-3">
               {[
                 {
-                  label: "Live inserts",
-                  value: "Supabase Realtime",
+                  label: "Save roles",
+                  value: "Keep a shortlist for later review",
                 },
                 {
-                  label: "Auth",
-                  value: "Clerk user sessions",
+                  label: "Set defaults",
+                  value: "Track the topics, locations, and keywords you want",
                 },
                 {
-                  label: "Worker cadence",
-                  value: "6 hour Remotive sync",
+                  label: "See what changed",
+                  value: "New matches stay visible when you return",
                 },
               ].map((item) => (
                 <div
                   key={item.label}
-                  className="rounded-[24px] border border-slate-200 bg-white/90 p-4 shadow-[0_18px_60px_-42px_rgba(15,23,42,0.45)]"
+                  className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-[0_18px_60px_-42px_rgba(15,23,42,0.3)]"
                 >
                   <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
                     {item.label}
                   </p>
-                  <p className="mt-3 text-lg font-semibold text-slate-950">
+                  <p className="mt-3 text-sm font-medium leading-6 text-slate-900">
                     {item.value}
                   </p>
                 </div>
@@ -71,14 +71,14 @@ export function LandingPage({ previewJobs }: LandingPageProps) {
             </div>
           </div>
 
-          <div className="rounded-[32px] border border-slate-200 bg-white/90 p-5 shadow-[0_24px_90px_-52px_rgba(15,23,42,0.55)]">
+          <div className="rounded-[32px] border border-slate-200 bg-white p-5 shadow-[0_24px_90px_-52px_rgba(15,23,42,0.45)]">
             <div className="flex items-center justify-between gap-3 border-b border-slate-200 pb-4">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
                   Feed preview
                 </p>
                 <h2 className="mt-1 text-2xl font-semibold tracking-tight text-slate-950">
-                  Recent openings
+                  Current openings
                 </h2>
               </div>
               <Link
@@ -114,9 +114,20 @@ export function LandingPage({ previewJobs }: LandingPageProps) {
                       </span>
                     </div>
                     <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">
-                      <span className="rounded-full bg-white px-3 py-1">
-                        {job.location ?? "Remote"}
+                      <span
+                        className={`rounded-full px-3 py-1 ${
+                          job.remote
+                            ? "bg-emerald-50 text-emerald-700"
+                            : "bg-white"
+                        }`}
+                      >
+                        {job.remote ? "Remote-friendly" : job.location ?? "On-site"}
                       </span>
+                      {job.remote && job.location ? (
+                        <span className="rounded-full bg-white px-3 py-1">
+                          {job.location}
+                        </span>
+                      ) : null}
                       <span className="rounded-full bg-white px-3 py-1">
                         {formatJobDate(job.publication_date)}
                       </span>

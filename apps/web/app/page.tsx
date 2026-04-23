@@ -14,7 +14,7 @@ export default async function Home() {
       .select("*")
       .eq("is_active", true)
       .order("publication_date", { ascending: false })
-      .limit(6);
+      .limit(8);
 
     return <LandingPage previewJobs={(previewJobs ?? []) as Job[]} />;
   }
@@ -42,11 +42,11 @@ export default async function Home() {
             Feed unavailable
           </p>
           <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
-            Supabase could not load the current jobs.
+            JobPulse could not load the current feed.
           </h1>
           <p className="mt-3 text-sm leading-6 text-slate-600">
-            Check the project env vars and database connectivity, then refresh
-            the page.
+            Check the deployment env vars and database connectivity, then refresh
+            to try again.
           </p>
         </div>
       </main>

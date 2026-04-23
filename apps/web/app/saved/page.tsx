@@ -26,7 +26,8 @@ export default async function SavedJobsPage() {
             Saved jobs are temporarily unavailable.
           </h1>
           <p className="mt-3 text-sm leading-6 text-slate-600">
-            Try again after checking Supabase connectivity.
+            Try again after checking the deployment env vars and database
+            connectivity.
           </p>
         </div>
       </main>
@@ -51,7 +52,8 @@ export default async function SavedJobsPage() {
               Saved jobs are temporarily unavailable.
             </h1>
             <p className="mt-3 text-sm leading-6 text-slate-600">
-              Try again after checking Supabase connectivity.
+              Try again after checking the deployment env vars and database
+              connectivity.
             </p>
           </div>
         </main>

@@ -1,7 +1,7 @@
 {
   "name": "@jobpulse/worker",
   "version": "1.0.0",
-  "description": "Background worker for polling Remotive jobs into Supabase",
+  "description": "Background worker for syncing Arbeitnow jobs into Supabase",
   "main": "index.ts",
   "scripts": {
     "start": "npx tsx index.ts",

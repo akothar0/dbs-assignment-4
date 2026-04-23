@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -10,12 +10,54 @@ import {
   UserButton,
 } from "@clerk/nextjs";
 
+interface FeedSummary {
+  unseenCount: number;
+}
+
 export function Navbar() {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [unseenCount, setUnseenCount] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadFeedSummary() {
+      try {
+        const response = await fetch("/api/feed-summary");
+
+        if (!response.ok || cancelled) {
+          return;
+        }
+
+        const data = (await response.json()) as FeedSummary;
+
+        if (!cancelled) {
+          setUnseenCount(data.unseenCount ?? 0);
+        }
+      } catch {
+        if (!cancelled) {
+          setUnseenCount(0);
+        }
+      }
+    }
+
+    function handleFeedViewed() {
+      setUnseenCount(0);
+    }
+
+    window.addEventListener("jobpulse:feed-viewed", handleFeedViewed);
+    void loadFeedSummary();
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener("jobpulse:feed-viewed", handleFeedViewed);
+    };
+  }, [pathname]);
+
   const navLinks = [
-    { href: "/", label: "Feed" },
-    { href: "/saved", label: "Saved Jobs" },
+    { href: "/", label: "Feed", badge: unseenCount > 0 ? unseenCount : null },
+    { href: "/saved", label: "Saved" },
     { href: "/preferences", label: "Preferences" },
   ];
 
@@ -24,7 +66,7 @@ export function Navbar() {
       <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6">
         <Link
           href="/"
-          className="flex items-center gap-3 text-sm font-semibold tracking-[0.2em] text-slate-900 uppercase"
+          className="flex items-center gap-3 text-sm font-semibold uppercase tracking-[0.2em] text-slate-900"
         >
           <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-slate-900 text-xs font-bold text-white">
             JP
@@ -55,13 +97,24 @@ export function Navbar() {
                   <Link
                     key={link.href}
                     href={link.href}
-                    className={`rounded-full border px-4 py-2 text-sm font-medium transition ${
+                    className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition ${
                       active
                         ? "border-slate-900 bg-slate-900 text-white"
                         : "border-slate-300 text-slate-700 hover:border-slate-900 hover:text-slate-900"
                     }`}
                   >
                     {link.label}
+                    {link.badge ? (
+                      <span
+                        className={`inline-flex min-w-6 items-center justify-center rounded-full px-2 py-0.5 text-xs font-semibold ${
+                          active
+                            ? "bg-white text-slate-900"
+                            : "bg-sky-100 text-sky-800"
+                        }`}
+                      >
+                        {link.badge}
+                      </span>
+                    ) : null}
                   </Link>
                 );
               })}
@@ -98,13 +151,24 @@ export function Navbar() {
                       key={link.href}
                       href={link.href}
                       onClick={() => setMenuOpen(false)}
-                      className={`rounded-2xl px-4 py-3 text-sm font-medium transition ${
+                      className={`inline-flex items-center justify-between rounded-2xl px-4 py-3 text-sm font-medium transition ${
                         active
                           ? "bg-slate-900 text-white"
                           : "bg-white text-slate-700 hover:text-slate-950"
                       }`}
                     >
-                      {link.label}
+                      <span>{link.label}</span>
+                      {link.badge ? (
+                        <span
+                          className={`inline-flex min-w-6 items-center justify-center rounded-full px-2 py-0.5 text-xs font-semibold ${
+                            active
+                              ? "bg-white text-slate-900"
+                              : "bg-sky-100 text-sky-800"
+                          }`}
+                        >
+                          {link.badge}
+                        </span>
+                      ) : null}
                     </Link>
                   );
                 })}

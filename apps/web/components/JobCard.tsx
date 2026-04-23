@@ -1,8 +1,16 @@
 "use client";
 
-import { formatCategoryLabel, formatJobDate, getCategoryClasses, type Job } from "@/lib/jobs";
+import {
+  formatCategoryLabel,
+  formatJobDate,
+  getCategoryClasses,
+  type Job,
+} from "@/lib/jobs";
 
 interface JobCardProps {
+  archivedMessage?: string;
+  isArchived?: boolean;
+  isNew?: boolean;
   isSaved: boolean;
   isSaving: boolean;
   job: Job;
@@ -29,13 +37,22 @@ function BookmarkIcon({ filled }: { filled: boolean }) {
 }
 
 export function JobCard({
+  archivedMessage,
+  isArchived = false,
+  isNew = false,
   isSaved,
   isSaving,
   job,
   onToggleSave,
 }: JobCardProps) {
   return (
-    <article className="grid gap-5 rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_18px_50px_-30px_rgba(15,23,42,0.45)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_24px_60px_-32px_rgba(15,23,42,0.4)] sm:grid-cols-[auto_1fr_auto]">
+    <article
+      className={`grid gap-5 rounded-[28px] border p-6 transition duration-200 sm:grid-cols-[auto_1fr_auto] ${
+        isArchived
+          ? "border-amber-200 bg-amber-50/60 shadow-[0_12px_40px_-30px_rgba(217,119,6,0.45)]"
+          : "border-slate-200 bg-white shadow-[0_18px_50px_-30px_rgba(15,23,42,0.45)] hover:-translate-y-0.5 hover:shadow-[0_24px_60px_-32px_rgba(15,23,42,0.35)]"
+      }`}
+    >
       <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-slate-100">
         {job.company_logo ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -62,27 +79,53 @@ export function JobCard({
             </h2>
           </div>
 
-          <span
-            className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-inset ${getCategoryClasses(job.category)}`}
-          >
-            {formatCategoryLabel(job.category)}
-          </span>
+          <div className="flex flex-wrap gap-2">
+            {isNew ? (
+              <span className="inline-flex rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-800">
+                New
+              </span>
+            ) : null}
+            {isArchived ? (
+              <span className="inline-flex rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
+                No longer active
+              </span>
+            ) : null}
+            <span
+              className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-inset ${getCategoryClasses(job.category)}`}
+            >
+              {formatCategoryLabel(job.category)}
+            </span>
+          </div>
         </div>
 
         <div className="flex flex-wrap gap-2 text-sm text-slate-600">
-          <span className="rounded-full bg-slate-100 px-3 py-1">
-            {job.location ?? "Remote"}
+          <span
+            className={`rounded-full px-3 py-1 ${
+              job.remote ? "bg-emerald-50 text-emerald-700" : "bg-slate-100"
+            }`}
+          >
+            {job.remote ? "Remote-friendly" : job.location ?? "On-site"}
           </span>
+          {job.remote && job.location ? (
+            <span className="rounded-full bg-slate-100 px-3 py-1">
+              {job.location}
+            </span>
+          ) : null}
           {job.job_type ? (
             <span className="rounded-full bg-slate-100 px-3 py-1">
-              {job.job_type.replaceAll("_", " ")}
+              {job.job_type}
             </span>
           ) : null}
           {job.salary ? (
-            <span className="rounded-full bg-slate-100 px-3 py-1">{job.salary}</span>
+            <span className="rounded-full bg-slate-100 px-3 py-1">
+              {job.salary}
+            </span>
           ) : null}
           <span className="rounded-full bg-slate-100 px-3 py-1">
             {formatJobDate(job.publication_date)}
+          </span>
+          <span className="rounded-full bg-slate-100 px-3 py-1">
+            {job.source === "arbeitnow" ? "Arbeitnow" : "Imported"}
           </span>
         </div>
 
@@ -97,6 +140,10 @@ export function JobCard({
               </span>
             ))}
           </div>
+        ) : null}
+
+        {isArchived && archivedMessage ? (
+          <p className="text-sm leading-6 text-amber-900">{archivedMessage}</p>
         ) : null}
       </div>
 

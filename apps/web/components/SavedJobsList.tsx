@@ -50,14 +50,14 @@ export function SavedJobsList({ initialJobs }: SavedJobsListProps) {
     <div className="space-y-6">
       <section className="space-y-3 rounded-[32px] border border-slate-200 bg-white p-8 shadow-[0_24px_80px_-48px_rgba(15,23,42,0.55)]">
         <p className="text-xs font-semibold uppercase tracking-[0.28em] text-sky-700">
-          Saved Queue
+          Saved
         </p>
         <h1 className="text-4xl font-semibold tracking-tight text-slate-950">
-          Roles worth revisiting.
+          Your shortlist.
         </h1>
         <p className="max-w-2xl text-sm leading-7 text-slate-600">
-          Keep promising roles in one place and prune the list as your search
-          changes.
+          Keep the jobs you want to revisit, even after a listing drops out of
+          the active feed.
         </p>
       </section>
 
@@ -82,8 +82,10 @@ export function SavedJobsList({ initialJobs }: SavedJobsListProps) {
             <JobCard
               key={job.id}
               job={job}
+              isArchived={!job.is_active}
               isSaved
               isSaving={savingJobId === job.id}
+              archivedMessage="This listing has been archived from the live feed, but you can keep it here for reference."
               onToggleSave={handleToggleSave}
             />
           ))}

@@ -1,9 +1,19 @@
 # JobPulse
 
-JobPulse is a monorepo for a live remote job alert board:
+JobPulse is a monorepo for a personalized jobs board:
 
-- `apps/web`: Next.js frontend with Clerk auth and Supabase Realtime
-- `apps/worker`: standalone TypeScript worker that polls the Remotive API and upserts jobs into Supabase
+- `apps/web`: Next.js app with Clerk auth, Supabase data access, realtime feed updates, saved jobs, and feed defaults
+- `apps/worker`: standalone TypeScript worker that syncs paginated Arbeitnow jobs into Supabase
+
+## Product direction
+
+JobPulse is now a broader jobs board, not a remote-only alert board.
+
+The main user flow is:
+- open the feed and review `New for you`
+- refine with topic, keyword, remote, and location filters
+- save promising roles
+- return later and see what changed since the last visit
 
 ## Local development
 
@@ -42,27 +52,43 @@ Worker expects `apps/worker/.env` with:
 SUPABASE_URL=
 SUPABASE_SERVICE_ROLE_KEY=
 POLL_INTERVAL_MS=
+JOB_SOURCE_PROVIDER=arbeitnow
+ARBEITNOW_MAX_PAGES=5
 ```
+
+## Database
+
+Reference SQL lives in:
+
+- `supabase/schema.sql`
+- `supabase/migrations/20260423103000_arbeitnow_reposition.sql`
+
+Core tables:
+
+- `jobs`
+- `user_preferences`
+- `saved_jobs`
 
 ## Deployment
 
 Frontend:
 
-- Deploy `apps/web` to Vercel
-- Set the project root to `apps/web`
-- Add the four frontend env vars from `apps/web/.env.local`
+- deploy `apps/web` to Vercel
+- set project root to `apps/web`
+- add the frontend env vars above
 
 Worker:
 
-- Deploy `apps/worker` to Railway
-- Set the project root to `apps/worker`
-- Use `npm start` as the start command
-- Add `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`
+- deploy `apps/worker` to Railway
+- set project root to `apps/worker`
+- use `npm start`
+- add the worker env vars above
 
 ## Validation checklist
 
-- Sign up or sign in through Clerk
-- Confirm the feed loads jobs from Supabase
-- Save a job and confirm it appears on `/saved`
-- Set categories and keywords on `/preferences`
-- Confirm new jobs appear through the realtime subscription
+- sign in through Clerk
+- confirm the feed loads active jobs
+- confirm `New for you` and `All matches` render as expected
+- change preferences and verify the feed defaults update
+- save a job and confirm it appears on `/saved`
+- confirm archived saved jobs stay visible and marked inactive

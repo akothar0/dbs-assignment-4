@@ -1,173 +1,185 @@
-# JobPulse — Live Remote Job Alert Board
+# JobPulse — Personalized Jobs Board
 
 ## Overview
-A real-time job alert system that polls the Remotive API for remote job listings, stores them in Supabase, and displays matching jobs to users on a Next.js frontend. Users sign up via Clerk, set their job preferences (categories, keywords), and see new matching jobs appear in real time without page refresh.
+JobPulse is a Clerk-authenticated jobs board that syncs openings from the Arbeitnow public API into Supabase, then presents them in a Next.js app with durable "new since last visit" cues, saved jobs, and preference-driven defaults.
 
-## Architecture
+The product is no longer a Remotive-only remote alert board. It now treats Arbeitnow as a broader jobs source and exposes remote work as a first-class filter rather than the entire product definition.
 
-```
-Remotive API (free, no auth)
-      │  polls every 5 minutes
+## Current Architecture
+
+```text
+Arbeitnow API (public, paginated)
+      │  sync on boot + every 6 hours by default
       ▼
-┌─────────────┐       ┌──────────────────┐       ┌──────────────────┐
-│   Worker     │──────▶│    Supabase      │◀──────│   Frontend       │
-│  (Railway)   │ write │  - jobs table    │ read  │  (Next.js/Vercel)│
-│  Node.js     │       │  - user_prefs    │ + RT  │  + Clerk Auth    │
-│  cron: 5min  │       │  - saved_jobs    │       │  + Tailwind CSS  │
-└─────────────┘       └──────────────────┘       └──────────────────┘
-                        Realtime enabled on         Subscribes to
-                        `jobs` table                Realtime changes
+┌─────────────┐       ┌──────────────────────┐       ┌─────────────────────┐
+│   Worker    │──────▶│      Supabase        │◀──────│     Frontend        │
+│ (Railway)   │ write │  - jobs              │ read  │ (Next.js / Vercel)  │
+│ Node.js     │       │  - user_preferences  │ + RT  │ Clerk auth + UI     │
+└─────────────┘       │  - saved_jobs        │       └─────────────────────┘
+                      └──────────────────────┘
 ```
 
 ## Data Flow
-1. **Worker** (Railway) runs on a 5-minute interval
-2. Worker fetches `https://remotive.com/api/remote-jobs` (returns all remote jobs as JSON)
-3. Worker parses response, upserts into Supabase `jobs` table (keyed on `remotive_id`)
-4. Supabase **Realtime** broadcasts INSERT events on `jobs` table
-5. **Frontend** (Vercel) subscribes to Realtime channel on `jobs`
-6. When new jobs arrive, frontend filters against the logged-in user's preferences and displays matches
-7. Users can **save/bookmark** jobs → stored in `saved_jobs` table
+1. The Railway worker starts, polls Arbeitnow immediately, then repeats on a configurable interval. The default is `6 hours`.
+2. The worker fetches paginated Arbeitnow results (`100` jobs per page) until the feed is exhausted or a configured page cap is reached.
+3. The worker normalizes each listing into the shared `jobs` table, keyed by `(source, source_job_id)`.
+4. Each synced row is marked active with fresh `last_seen_at`; jobs missing from the latest source snapshot are soft-archived with `is_active = false` and `archived_at`.
+5. The Next.js app server-renders the feed from active jobs only and loads saved job ids for the signed-in user.
+6. The client fetches saved preference defaults, marks the feed as viewed, and then applies topic, keyword, remote, and location filters in the browser.
+7. Supabase Realtime subscriptions on `jobs` `INSERT` and `UPDATE` keep the in-app feed aligned with worker syncs.
+8. Saved jobs persist even when a listing is archived; archived rows remain visible on `/saved` but never appear in the main feed.
 
 ## Monorepo Structure
-```
+```text
 /
 ├── CLAUDE.md
 ├── AGENTS.md
+├── supabase/
+│   ├── schema.sql
+│   └── migrations/
 ├── apps/
-│   ├── web/                    # Next.js 14+ App Router frontend
+│   ├── web/
 │   │   ├── app/
-│   │   │   ├── layout.tsx      # ClerkProvider + nav
-│   │   │   ├── page.tsx        # Landing / job feed (protected)
+│   │   │   ├── api/
 │   │   │   ├── preferences/
-│   │   │   │   └── page.tsx    # User preference settings
-│   │   │   └── saved/
-│   │   │       └── page.tsx    # Saved/bookmarked jobs
+│   │   │   ├── saved/
+│   │   │   ├── layout.tsx
+│   │   │   └── page.tsx
 │   │   ├── components/
-│   │   │   ├── JobCard.tsx
-│   │   │   ├── JobFeed.tsx     # Realtime subscription + display
-│   │   │   ├── CategoryFilter.tsx
-│   │   │   └── Navbar.tsx
-│   │   ├── utils/
-│   │   │   └── supabase/
-│   │   │       ├── client.ts   # Browser client
-│   │   │       ├── server.ts   # Server client
-│   │   │       └── middleware.ts
-│   │   ├── middleware.ts       # Clerk middleware
-│   │   ├── .env.local          # All env vars
-│   │   ├── tailwind.config.ts
-│   │   ├── next.config.js
-│   │   └── package.json
-│   └── worker/                 # Background worker
-│       ├── index.ts            # Main polling script
-│       ├── package.json
-│       └── .env                # SUPABASE_URL + SERVICE_ROLE_KEY
-├── package.json                # Root (workspaces)
-└── .gitignore
+│   │   ├── lib/
+│   │   ├── middleware.ts
+│   │   └── utils/supabase/
+│   └── worker/
+│       ├── index.ts
+│       └── package.json
+└── package.json
 ```
 
-## Database Schema (Supabase)
+## Database Schema
 
-### `jobs` table
-| Column        | Type        | Notes                          |
-|---------------|-------------|--------------------------------|
-| id            | uuid (PK)   | auto-generated                 |
-| remotive_id   | integer     | UNIQUE — from Remotive API     |
-| title         | text        |                                |
-| company_name  | text        |                                |
-| category      | text        | e.g. "software-dev"            |
-| tags          | text[]      | skill tags from API            |
-| job_type      | text        | full_time, contract, etc.      |
-| url           | text        | link to job posting            |
-| salary        | text        | salary string (if provided)    |
-| location      | text        | e.g. "Worldwide", "USA Only"   |
-| publication_date | timestamptz |                              |
-| company_logo  | text        | logo URL                       |
-| created_at    | timestamptz | default now()                  |
+### `jobs`
+Purpose: source-normalized listings from external job providers.
 
-**Realtime: ENABLED on this table (INSERT events)**
+Important columns:
+- `id uuid primary key`
+- `remotive_id integer unique null`
+- `source text not null default 'remotive'`
+- `source_job_id text not null`
+- `source_slug text null`
+- `title text not null`
+- `company_name text not null`
+- `category text null`
+- `tags text[]`
+- `job_type text null`
+- `url text not null`
+- `salary text null`
+- `location text null`
+- `remote boolean not null default false`
+- `description_html text null`
+- `publication_date timestamptz null`
+- `company_logo text null`
+- `is_active boolean not null default true`
+- `last_seen_at timestamptz not null default now()`
+- `archived_at timestamptz null`
+- `created_at timestamptz default now()`
 
-### `user_preferences` table
-| Column        | Type        | Notes                          |
-|---------------|-------------|--------------------------------|
-| id            | uuid (PK)   | auto-generated                 |
-| user_id       | text        | Clerk user ID (UNIQUE)         |
-| categories    | text[]      | selected job categories        |
-| keywords      | text[]      | search keywords                |
-| created_at    | timestamptz | default now()                  |
-| updated_at    | timestamptz | default now()                  |
+Indexes / constraints:
+- legacy uniqueness on `remotive_id`
+- current source-aware uniqueness on `(source, source_job_id)`
 
-### `saved_jobs` table
-| Column        | Type        | Notes                          |
-|---------------|-------------|--------------------------------|
-| id            | uuid (PK)   | auto-generated                 |
-| user_id       | text        | Clerk user ID                  |
-| job_id        | uuid (FK)   | references jobs.id             |
-| created_at    | timestamptz | default now()                  |
+Realtime:
+- enabled on `jobs`
+- the frontend listens for both `INSERT` and `UPDATE`
 
-**UNIQUE constraint on (user_id, job_id)**
+### `user_preferences`
+Purpose: per-user feed defaults and read state.
 
-## RLS Policies
-- `jobs`: SELECT open to all authenticated (or even anon); INSERT/UPDATE only via service role (worker)
-- `user_preferences`: Users can only SELECT/INSERT/UPDATE/DELETE their own rows (WHERE user_id = auth.uid() or via Clerk ID matching)
-- `saved_jobs`: Users can only SELECT/INSERT/DELETE their own rows
+Important columns:
+- `user_id text unique not null`
+- `categories text[]`
+- `keywords text[]`
+- `remote_only boolean not null default false`
+- `preferred_locations text[] not null default '{}'`
+- `last_feed_viewed_at timestamptz null`
+- `created_at`
+- `updated_at`
 
-**Note:** Since we use Clerk (not Supabase Auth), RLS policies that rely on `auth.uid()` won't work directly. Instead, use permissive policies for reads and pass `user_id` filters from the application layer, OR use service role key on server-side API routes that verify Clerk session first.
+### `saved_jobs`
+Purpose: user bookmarks.
 
-## Remotive API
-- Endpoint: `https://remotive.com/api/remote-jobs`
-- Method: GET
-- Auth: None required
-- Rate limits: Reasonable (no documented limit, poll every 5 min)
-- Response shape:
-```json
-{
-  "job-count": 1234,
-  "jobs": [
-    {
-      "id": 12345,
-      "url": "https://remotive.com/remote-jobs/...",
-      "title": "Senior Frontend Engineer",
-      "company_name": "Acme Inc",
-      "company_logo": "https://...",
-      "category": "software-dev",
-      "tags": ["javascript", "react", "typescript"],
-      "job_type": "full_time",
-      "publication_date": "2026-04-20T00:00:00",
-      "salary": "$120k - $150k",
-      "candidate_required_location": "Worldwide"
-    }
-  ]
-}
-```
+Important columns:
+- `user_id text not null`
+- `job_id uuid not null references jobs(id) on delete cascade`
+- `created_at`
+- unique `(user_id, job_id)`
 
-## Available Remotive Categories
-software-dev, customer-support, design, marketing, sales, product, business, data, devops, finance, human-resources, qa, writing, all-others
+## Taxonomy and Filtering
+JobPulse uses a stable product topic layer instead of exposing source-specific categories directly.
+
+Current normalized topics:
+- `Software Engineering`
+- `Product`
+- `Design`
+- `Data`
+- `Marketing`
+- `Sales`
+- `Finance`
+- `Operations`
+- `Customer Support`
+- `HR`
+- `Security`
+- `Other`
+
+The worker stores the normalized topic in `jobs.category` and preserves the source tags in `jobs.tags`.
+
+Saved preferences are compatibility-mapped when older Remotive slugs or labels are encountered. Example:
+- `software-dev -> Software Engineering`
+- `customer-support -> Customer Support`
+- `product -> Product`
+- `Project Management -> Product`
+- `Software Development -> Software Engineering`
+
+## Arbeitnow Source Notes
+- endpoint: `https://www.arbeitnow.com/api/job-board-api?page=1`
+- no API key required
+- pagination via `links.next`
+- jobs are updated hourly by the provider
+- each record includes `slug`, `remote`, `tags`, `job_types`, `location`, `description`, and `created_at`
+
+## Auth and Access Model
+- Clerk handles all user authentication
+- Supabase Auth is not used
+- frontend data access uses `createBrowserClient` and `createServerClient` from `@supabase/ssr`
+- worker writes use `SUPABASE_SERVICE_ROLE_KEY`
+- server API routes enforce the current Clerk user and then read/write Supabase rows
+
+## Product Surfaces
+- `/`: signed-in feed with "New for you" and "All matches"
+- `/saved`: saved shortlist, including archived listings marked `No longer active`
+- `/preferences`: feed defaults for topics, keywords, remote-only mode, and preferred locations
+- signed-out `/`: landing page plus read-only job preview
+
+## Deployment
+- `apps/web` deploys to Vercel
+- `apps/worker` deploys to Railway
+- Supabase hosts the database and Realtime
+- Clerk provides auth for both local and deployed environments
 
 ## Environment Variables
 
-### Frontend (apps/web/.env.local)
-```
-NEXT_PUBLIC_SUPABASE_URL=<supabase-url>
-NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<supabase-anon-key>
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=<clerk-pub-key>
-CLERK_SECRET_KEY=<clerk-secret>
-```
-
-### Worker (apps/worker/.env)
-```
-SUPABASE_URL=<supabase-url>
-SUPABASE_SERVICE_ROLE_KEY=<service-role-key>
+### Frontend
+```bash
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=
+CLERK_SECRET_KEY=
 ```
 
-### Railway (worker env vars)
-Same as worker .env, set in Railway dashboard.
-
-### Vercel (frontend env vars)
-Same as frontend .env.local, set in Vercel dashboard.
-
-## Key Technical Decisions
-- **Clerk for auth** (not Supabase Auth) — assignment requirement
-- **Supabase for data + realtime** — worker writes with service role key, frontend reads with anon key + Realtime subscription
-- **No API routes needed for jobs** — frontend reads directly from Supabase client-side
-- **API routes for preferences/saved** — server-side routes verify Clerk session, then read/write Supabase with user_id
-- **Worker is standalone Node.js** — not a Next.js app, just a script with setInterval or cron
+### Worker
+```bash
+SUPABASE_URL=
+SUPABASE_SERVICE_ROLE_KEY=
+POLL_INTERVAL_MS=
+JOB_SOURCE_PROVIDER=arbeitnow
+ARBEITNOW_MAX_PAGES=5
+```

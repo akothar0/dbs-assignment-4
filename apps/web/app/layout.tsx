@@ -5,7 +5,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "JobPulse",
-  description: "Live remote job alerts with Clerk and Supabase Realtime.",
+  description: "Personalized job tracking with saved roles, feed defaults, and durable new-match alerts.",
 };
 
 export default function RootLayout({
