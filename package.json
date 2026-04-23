@@ -1,0 +1,7 @@
+{
+  "name": "jobpulse",
+  "private": true,
+  "workspaces": [
+    "apps/*"
+  ]
+}
